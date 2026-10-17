@@ -1,0 +1,12 @@
+verifyDepsBeforeRun: false
+overrides:
+  vite: 7.3.7
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+ignoredBuiltDependencies:
+  - spawn-sync
+allowBuilds:
+  esbuild: true
+  sharp: true
+  spawn-sync: false

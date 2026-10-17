@@ -1,0 +1,14 @@
+node_modules/
+.pnpm-store/
+.output/
+.wxt/
+dist/
+coverage/
+*.log
+.env*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.zip
+bell-work-backup-*.json

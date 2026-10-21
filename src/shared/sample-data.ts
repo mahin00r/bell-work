@@ -26,6 +26,37 @@ export function sampleData(): Item[] {
       tags: ['sample'],
       checklist: item.checklist.map((c, n) => ({ ...c, done: n === 0 })),
       followUpAt: ['applied', 'interview'].includes(status) ? shiftDay(today(), offset) : undefined,
+      events:
+        status === 'interview'
+          ? [
+              {
+                id: 'sample-interview',
+                kind: 'interview',
+                title: 'Meet the design team',
+                date: shiftDay(today(), 1),
+                time: '10:00',
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              },
+            ]
+          : status === 'offer'
+            ? [
+                {
+                  id: 'sample-decision',
+                  kind: 'offer',
+                  title: 'Confirm fellowship offer',
+                  date: shiftDay(today(), 5),
+                },
+              ]
+            : kind === 'study' && status === 'preparing'
+              ? [
+                  {
+                    id: 'sample-documents',
+                    kind: 'document',
+                    title: 'Prepare the transcript',
+                    date: shiftDay(today(), 2),
+                  },
+                ]
+              : [],
       statusHistory: [
         ...item.statusHistory,
         ...(status !== 'saved' ? [{ status, at: item.createdAt }] : []),

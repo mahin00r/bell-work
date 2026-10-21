@@ -1,11 +1,14 @@
+import { formatDate as format } from '../../ui/i18n';
+import { t } from '../../ui/i18n';
 import { useEffect, useState } from 'react';
-import { format } from 'date-fns';
+
 import { ArrowUpRight, Plus, Settings2 } from 'lucide-react';
 import { MotionConfig } from 'motion/react';
 import { Brand, Button, Chip, IconButton, Providers } from '../../ui/primitives';
 import { actionable, dueDate } from '../../shared/selectors';
 import { today } from '../../shared/dates';
 import { initializeStore, useStore, commit } from '../../shared/store';
+import { exportRawData } from '../../shared/export';
 import { capturePage, openDashboard, type Capture } from '../../shared/capture';
 import { useTheme } from '../../ui/theme';
 import { QuickAdd } from '../quick-add/QuickAdd';
@@ -13,7 +16,7 @@ import { Welcome, SampleBanner } from '../welcome/Welcome';
 import { Today } from './Today';
 import { CommandPalette } from '../command-palette/CommandPalette';
 export function Popup() {
-  const { data, ready, error } = useStore();
+  const { data, ready, error, loadFailed } = useStore();
   const [capture, setCapture] = useState<Capture | null>(null);
   const [palette, setPalette] = useState(false);
   const overdue = data.items.filter(
@@ -24,6 +27,7 @@ export function Popup() {
     void initializeStore();
   }, []);
   const add = () => {
+    if (loadFailed) return;
     void capturePage().then(setCapture);
   };
   return (
@@ -33,10 +37,13 @@ export function Popup() {
           <header className="popup-header">
             <Brand compact />
             <div className="inline">
-              <IconButton label="Open dashboard" onClick={() => openDashboard()}>
+              <IconButton label={t('Open dashboard')} onClick={() => openDashboard()}>
                 <ArrowUpRight size={17} />
               </IconButton>
-              <IconButton label="Settings" onClick={() => openDashboard(undefined, 'settings')}>
+              <IconButton
+                label={t('Settings')}
+                onClick={() => openDashboard(undefined, 'settings')}
+              >
                 <Settings2 size={16} />
               </IconButton>
             </div>
@@ -46,22 +53,41 @@ export function Popup() {
               <div>
                 <p className="eyebrow">{format(new Date(), 'EEEE, MMMM d')}</p>
                 <h1>
-                  Your day, in focus<span>.</span>
+                  {t('Your day, in focus')}
+                  <span>.</span>
                 </h1>
               </div>
               <div className="inline">
-                {overdue > 0 && <Chip tone="danger">{overdue} overdue</Chip>}
-                <IconButton label="Add item" onClick={add}>
+                {overdue > 0 && (
+                  <Chip tone="danger">
+                    {overdue}
+                    {t('overdue')}
+                  </Chip>
+                )}
+                <IconButton label={t('Add item')} onClick={add}>
                   <Plus size={19} />
                 </IconButton>
               </div>
             </div>
             {error && (
               <p role="alert" className="error">
-                {error}
+                {t(error)}
               </p>
             )}
-            {ready ? (
+            {ready && loadFailed ? (
+              <div className="form-stack">
+                <Button
+                  onClick={() => {
+                    void exportRawData();
+                  }}
+                >
+                  {t('Export raw stored data')}
+                </Button>
+                <Button onClick={() => openDashboard(undefined, 'settings')}>
+                  {t('Open recovery settings')}
+                </Button>
+              </div>
+            ) : ready ? (
               <>
                 <SampleBanner />
                 <Welcome onAdd={add} />
@@ -70,7 +96,7 @@ export function Popup() {
                 )}
               </>
             ) : (
-              <div className="loading" aria-label="Loading your items">
+              <div className="loading" aria-label={t('Loading your items')}>
                 <span />
                 <span />
                 <span />
@@ -79,10 +105,12 @@ export function Popup() {
           </main>
           <footer className="popup-footer">
             <span className="inline">
-              <span className="local-dot" /> All yours. All local.
+              <span className="local-dot" />
+              {t('All yours. All local.')}
             </span>
             <Button variant="ghost" onClick={() => openDashboard()}>
-              Open dashboard <ArrowUpRight size={12} />
+              {t('Open dashboard')}
+              <ArrowUpRight size={12} />
             </Button>
           </footer>
           {capture && (

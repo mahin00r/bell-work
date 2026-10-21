@@ -6,6 +6,8 @@ import type {
   settingsSchema,
   stateSchema,
   moneySchema,
+  applicationEventSchema,
+  billingAnchorSchema,
 } from './schema';
 export type Application = z.infer<typeof applicationSchema>;
 export type Subscription = z.infer<typeof subscriptionSchema>;
@@ -15,3 +17,5 @@ export type Money = z.infer<typeof moneySchema>;
 export type Settings = z.infer<typeof settingsSchema>;
 export type State = z.infer<typeof stateSchema>;
 export type Status = Application['status'];
+export type ApplicationEvent = z.infer<typeof applicationEventSchema>;
+export type BillingAnchor = z.infer<typeof billingAnchorSchema>;

@@ -47,6 +47,7 @@ it('round-trips notification targets and tolerates unrelated IDs', () => {
   expect(noticeTarget(noticeId('abc_123|trial|2026-10-20|2'))).toEqual({
     itemId: 'abc_123',
     type: 'trial',
+    date: '2026-10-20',
   });
   expect(noticeTarget('other')).toBeNull();
   expect(noticeTarget('bellwork:%bad')).toBeNull();

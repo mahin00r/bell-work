@@ -1,4 +1,6 @@
-import { format, parseISO, startOfWeek, subWeeks, isSameWeek } from 'date-fns';
+import { formatDate as format } from '../../ui/i18n';
+import { t } from '../../ui/i18n';
+import { parseISO, startOfWeek, subWeeks, isSameWeek } from 'date-fns';
 import { ArrowUpRight, Send, Sprout, Wallet } from 'lucide-react';
 import { Chip, EmptyState } from '../../ui/primitives';
 import { funnel, isApplication, upcomingSpend } from '../../shared/selectors';
@@ -6,7 +8,7 @@ import { useStore } from '../../shared/store';
 import { AnimatedMoney } from '../subscriptions/Subscriptions';
 export function Insights() {
   const { items, settings } = useStore((s) => s.data);
-  const apps = items.filter(isApplication).filter((i) => !i.archivedAt);
+  const apps = items.filter(isApplication).filter((i) => !i.archivedAt && !i.deletedAt);
   const counts = funnel(items);
   const spend = Object.entries(upcomingSpend(items));
   const sent = apps.filter(
@@ -37,24 +39,30 @@ export function Insights() {
       <div className="metrics insight-metrics">
         <section className="metric">
           <span>
-            <Send size={15} /> Applications sent
+            <Send size={15} />
+            {t('Applications sent')}
           </span>
           <strong>{sent}</strong>
-          <small>Every submission is a step forward</small>
+          <small>{t('Every submission is a step forward')}</small>
         </section>
         <section className="metric">
           <span>
-            <Sprout size={15} /> Replies received
+            <Sprout size={15} />
+            {t('Replies received')}
           </span>
           <strong>
             {replies}
-            <em>{sent ? Math.round((replies / sent) * 100) : 0}% response</em>
+            <em>
+              {sent ? Math.round((replies / sent) * 100) : 0}
+              {t('% response')}
+            </em>
           </strong>
-          <small>Interviews, offers, and decisions</small>
+          <small>{t('Interviews, offers, and decisions')}</small>
         </section>
         <section className="metric">
           <span>
-            <Wallet size={15} /> Next 30 days
+            <Wallet size={15} />
+            {t('Next 30 days')}
           </span>
           {spend.length ? (
             spend.map(([currency, amount]) => (
@@ -67,16 +75,16 @@ export function Insights() {
               <AnimatedMoney currency={settings.defaultCurrency} amount={0} />
             </strong>
           )}
-          <small>Expected subscription renewals</small>
+          <small>{t('Expected subscription renewals')}</small>
         </section>
       </div>
       <div className="insights-charts">
         <section className="chart-panel">
           <div className="between">
-            <h2>Your application journey</h2>
-            <Chip>All time</Chip>
+            <h2>{t('Your application journey')}</h2>
+            <Chip>{t('All time')}</Chip>
           </div>
-          <p>Each stage counts applications that reached it.</p>
+          <p>{t('Each stage counts applications that reached it.')}</p>
           {apps.length ? (
             <div className="funnel-chart">
               {Object.entries(counts).map(([name, count], n) => (
@@ -100,22 +108,25 @@ export function Insights() {
             </div>
           ) : (
             <EmptyState
-              title="The first step is yours"
-              description="Your journey takes shape as you save and submit applications."
+              title={t('The first step is yours')}
+              description={t('Your journey takes shape as you save and submit applications.')}
             />
           )}
         </section>
         <section className="chart-panel">
           <div className="between">
-            <h2>Showing up, week by week</h2>
+            <h2>{t('Showing up, week by week')}</h2>
             <ArrowUpRight size={15} className="muted" />
           </div>
-          <p>Applications submitted in the past eight weeks.</p>
+          <p>{t('Applications submitted in the past eight weeks.')}</p>
           <svg
             className="weekly-chart"
             viewBox="0 0 420 190"
             role="img"
-            aria-label={`Weekly applications: ${weeks.map((w, n) => `${format(w, 'MMM d')}: ${weekly[n]}`).join(', ')}`}
+            aria-label={t(
+              'Weekly applications: {0}',
+              weeks.map((w, n) => `${format(w, 'MMM d')}: ${weekly[n]}`).join(', '),
+            )}
           >
             <line x1="10" y1="154" x2="410" y2="154" stroke="var(--border)" />
             {weeks.map((week, n) => {
@@ -157,7 +168,8 @@ export function Insights() {
       <div className="insight-note">
         <Sprout size={17} />
         <p>
-          Consistency opens doors.<span> Keep your next step small enough to start today.</span>
+          {t('Consistency opens doors.')}
+          <span>{t('Keep your next step small enough to start today.')}</span>
         </p>
       </div>
     </>

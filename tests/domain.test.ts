@@ -139,7 +139,7 @@ describe('reminder engine', () => {
     );
     expect((state.items[0] as Subscription).nextRenewal).toBe('2026-10-20');
     expect((state.items[1] as Subscription).nextRenewal).toBe('2026-09-20');
-    expect((snooze(trial, now, 'trial') as Subscription).trialEndsAt).toBe('2026-10-18');
+    expect((snooze(trial, now, 'trial') as Subscription).trialEndsAt).toBe('2026-10-19');
   });
   it('does not keep past application deadlines active after submission', () => {
     const applied = applyStatus(job('2026-10-10'), 'applied', now);
@@ -149,7 +149,7 @@ describe('reminder engine', () => {
 describe('backups and migrations', () => {
   it('upgrades v0 and rejects future versions and malformed backups', () => {
     expect(migrate({ schemaVersion: 0, items: [] }).settings.defaultCurrency).toBe('BDT');
-    expect(() => migrate({ schemaVersion: 2 })).toThrow('newer version');
+    expect(() => migrate({ schemaVersion: 3 })).toThrow('newer version');
     expect(() => parseBackup('{bad')).toThrow();
     expect(() =>
       parseBackup(

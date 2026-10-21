@@ -24,6 +24,9 @@ export function themePalette(accent: string, dark: boolean) {
 }
 export function useTheme(settings: Settings) {
   useEffect(() => {
+    document.documentElement.lang = settings.language;
+  }, [settings.language]);
+  useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const apply = () => {
       const dark = settings.theme === 'dark' || (settings.theme === 'system' && media.matches);

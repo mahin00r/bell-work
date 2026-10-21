@@ -4,17 +4,19 @@ Use Node.js 20.19 or newer and the pinned pnpm version in `package.json`. Instal
 
 ## Scripts
 
-| Command          | Purpose                                               |
-| ---------------- | ----------------------------------------------------- |
-| `pnpm dev`       | Start the extension development server.               |
-| `pnpm typecheck` | Prepare entrypoint types and check strict TypeScript. |
-| `pnpm lint`      | Run ESLint.                                           |
-| `pnpm format`    | Format source and documentation with Prettier.        |
-| `pnpm test`      | Run domain and component tests once.                  |
-| `pnpm icons`     | Resize the source SVG into the four packaged icons.   |
-| `pnpm build`     | Create the production extension.                      |
-| `pnpm zip`       | Build and package an archive.                         |
-| `pnpm check`     | Run typecheck, lint, tests, and build in order.       |
+| Command              | Purpose                                               |
+| -------------------- | ----------------------------------------------------- |
+| `pnpm dev`           | Start the extension development server.               |
+| `pnpm typecheck`     | Prepare entrypoint types and check strict TypeScript. |
+| `pnpm lint`          | Run ESLint.                                           |
+| `pnpm format`        | Format source and documentation with Prettier.        |
+| `pnpm test`          | Run domain and component tests once.                  |
+| `pnpm icons`         | Resize the source SVG into the four packaged icons.   |
+| `pnpm build`         | Create the production extension.                      |
+| `pnpm build:firefox` | Create the Firefox MV3 development build.             |
+| `pnpm zip`           | Build and package an archive.                         |
+| `pnpm zip:firefox`   | Package the unsigned Firefox development archive.     |
+| `pnpm check`         | Run typecheck, lint, tests, and both browser builds.  |
 
 Keep changes small and typed. Use the shared repository for every storage operation. Store calendar dates as local `YYYY-MM-DD` strings and timestamps as ISO strings. Keep currency totals independent. Add focused tests when changing reminders, migrations, validation, or calculations.
 

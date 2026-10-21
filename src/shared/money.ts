@@ -1,6 +1,6 @@
 import type { Money, Subscription } from './types';
-export function money(value: Money) {
-  const formatter = new Intl.NumberFormat('en-BD', {
+export function money(value: Money, language: 'en' | 'bn' = 'en') {
+  const formatter = new Intl.NumberFormat(language === 'bn' ? 'bn-BD' : 'en-BD', {
     style: 'currency',
     currency: value.currency,
     maximumFractionDigits: 2,

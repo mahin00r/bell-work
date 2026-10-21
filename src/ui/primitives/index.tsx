@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { forwardRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -11,10 +12,11 @@ import { Bell, BriefcaseBusiness, Check, GraduationCap, Repeat2, X } from 'lucid
 import type { Kind } from '../../shared/types';
 import { useEntrance } from '../motion';
 import { ErrorBoundary } from './ErrorBoundary';
-
 export const Button = forwardRef<
   HTMLButtonElement,
-  ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'default' | 'primary' | 'ghost' | 'danger' }
+  ButtonHTMLAttributes<HTMLButtonElement> & {
+    variant?: 'default' | 'primary' | 'ghost' | 'danger';
+  }
 >(function Button({ children, className = '', variant = 'default', ...props }, ref) {
   return (
     <button ref={ref} type="button" {...props} className={`button ${variant} ${className}`}>
@@ -24,7 +26,9 @@ export const Button = forwardRef<
 });
 export const IconButton = forwardRef<
   HTMLButtonElement,
-  ButtonHTMLAttributes<HTMLButtonElement> & { label: string }
+  ButtonHTMLAttributes<HTMLButtonElement> & {
+    label: string;
+  }
 >(function IconButton({ label, children, ...props }, ref) {
   return (
     <Tooltip.Root>
@@ -34,7 +38,7 @@ export const IconButton = forwardRef<
           {...props}
           variant="ghost"
           className={`icon-button ${props.className ?? ''}`}
-          aria-label={label}
+          aria-label={t(label)}
         >
           {children}
         </Button>
@@ -51,7 +55,10 @@ export function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <div className="brand">
       <img src="/icons/icon-32.png" width="32" height="32" alt="" />
-      <span>Bell Work{!compact && <small>Never miss a deadline</small>}</span>
+      <span>
+        {t('Bell Work')}
+        {!compact && <small>{t('Never miss a deadline')}</small>}
+      </span>
     </div>
   );
 }
@@ -73,7 +80,7 @@ export function ProgressRing({ done, total }: { done: number; total: number }) {
       height="24"
       viewBox="0 0 24 24"
       role="img"
-      aria-label={`${done} of ${total} checklist tasks complete`}
+      aria-label={t('{0} of {1} checklist tasks complete', done, total)}
     >
       <circle cx="12" cy="12" r="9" fill="none" stroke="var(--border)" strokeWidth="2" />
       <circle
@@ -114,13 +121,13 @@ export function Modal({
           <motion.section {...entrance} className={`modal ${drawer ? 'drawer' : ''}`}>
             <div className="modal-heading">
               <div>
-                <Dialog.Title>{title}</Dialog.Title>
+                <Dialog.Title>{t(title)}</Dialog.Title>
                 <Dialog.Description>
-                  {description ?? 'Keep the details in one place.'}
+                  {description ?? t('Keep the details in one place.')}
                 </Dialog.Description>
               </div>
               <Dialog.Close asChild>
-                <button className="button ghost icon-button" aria-label="Close">
+                <button className="button ghost icon-button" aria-label={t('Close')}>
                   <X size={18} />
                 </button>
               </Dialog.Close>
@@ -140,7 +147,10 @@ export function Segments({
 }: {
   value: string;
   onChange: (v: string) => void;
-  values: readonly { value: string; label: string }[];
+  values: readonly {
+    value: string;
+    label: string;
+  }[];
   label: string;
 }) {
   return (
@@ -148,7 +158,7 @@ export function Segments({
       <Tabs.List className="segments" aria-label={label}>
         {values.map((v) => (
           <Tabs.Trigger key={v.value} value={v.value}>
-            {v.label}
+            {t(v.label)}
           </Tabs.Trigger>
         ))}
       </Tabs.List>
@@ -181,7 +191,7 @@ export function Tick({
           </motion.span>
         </Checkbox.Indicator>
       </Checkbox.Root>
-      <span>{label}</span>
+      <span>{t(label)}</span>
     </label>
   );
 }
@@ -202,8 +212,8 @@ export function EmptyState({
           <Check size={12} />
         </span>
       </div>
-      <h3>{title}</h3>
-      <p>{description}</p>
+      <h3>{t(title)}</h3>
+      <p>{t(description)}</p>
       {action}
     </div>
   );
@@ -216,7 +226,10 @@ export function Menu({
   actions,
 }: {
   trigger: ReactNode;
-  actions: { label: string; action: () => void }[];
+  actions: {
+    label: string;
+    action: () => void;
+  }[];
 }) {
   return (
     <Dropdown.Root>
@@ -224,8 +237,8 @@ export function Menu({
       <Dropdown.Portal>
         <Dropdown.Content className="menu" sideOffset={4}>
           {actions.map((a) => (
-            <Dropdown.Item key={a.label} onSelect={a.action}>
-              {a.label}
+            <Dropdown.Item key={t(a.label)} onSelect={a.action}>
+              {t(a.label)}
             </Dropdown.Item>
           ))}
         </Dropdown.Content>

@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import type { Item } from '../shared/types';
@@ -32,7 +33,7 @@ export function useMilestones(items: Item[]) {
 export function Milestone() {
   const reduced = useReducedMotion();
   return (
-    <div className="milestone-burst" aria-label="A new milestone reached" role="status">
+    <div className="milestone-burst" aria-label={t('A new milestone reached')} role="status">
       {Array.from({ length: 6 }, (_, n) => (
         <motion.span
           key={n}

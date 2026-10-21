@@ -1,7 +1,10 @@
+import { eventTitle, formatDate as format, relativeDate as dueLabel } from '../../ui/i18n';
+import { t } from '../../ui/i18n';
+import { eventInstant, itemEvents, snoozeKey } from '../../shared/events';
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Archive, ArrowUpRight, Check, Clock3, Search } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { Archive, ArrowUpRight, Check, Clock3, Search, Pin } from 'lucide-react';
+import { parseISO } from 'date-fns';
 import { Button, Chip, EmptyState, IconButton, KindIcon, Segments } from '../../ui/primitives';
 import {
   applyStatus,
@@ -11,25 +14,31 @@ import {
   isSubscription,
   upcoming,
 } from '../../shared/selectors';
-import { daysUntil, dueLabel } from '../../shared/dates';
-import { money } from '../../shared/money';
-import { archiveItem, updateItem, useStore } from '../../shared/store';
+import { daysUntil } from '../../shared/dates';
+import { formatMoney as money } from '../../ui/i18n';
+import { archiveItem, commit, updateItem, useStore } from '../../shared/store';
 import { snooze } from '../../shared/reminders';
 import { snappy, useReducedMotion } from '../../ui/motion';
 import type { Item } from '../../shared/types';
-
 export function DueChip({ item }: { item: Item }) {
   const date = dueDate(item);
   const n = date ? daysUntil(date) : Infinity;
-  return <Chip tone={n < 0 ? 'danger' : n <= 3 ? 'warning' : ''}>{dueLabel(date)}</Chip>;
+  const event = itemEvents(item)[0];
+  const deferred = event && item.reminderSnoozes?.[snoozeKey(event)];
+  return (
+    <Chip tone={n < 0 ? 'danger' : n <= 3 ? 'warning' : ''}>
+      {dueLabel(date)}
+      {deferred && Date.parse(deferred) > Date.now() ? t(' \u00B7 Snoozed') : ''}
+    </Chip>
+  );
 }
-function Countdown({ date }: { date: string }) {
+function Countdown({ date, at }: { date: string; at?: number }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
-  const end = parseISO(`${date}T23:59:59`).getTime();
+  const end = at ?? parseISO(`${date}T23:59:59`).getTime();
   const total = Math.max(0, Math.floor((end - now) / 1000));
   const parts = [
     Math.floor(total / 86400),
@@ -39,12 +48,12 @@ function Countdown({ date }: { date: string }) {
   return (
     <div
       className="countdown"
-      aria-label={`${parts[0]} days, ${parts[1]} hours and ${parts[2]} minutes remaining`}
+      aria-label={t('{0} days, {1} hours and {2} minutes remaining', parts[0], parts[1], parts[2])}
     >
       {parts.map((n, i) => (
         <span key={i}>
           <b>{String(n).padStart(2, '0')}</b>
-          <small>{['days', 'hrs', 'min'][i]}</small>
+          <small>{t(['days', 'hrs', 'min'][i])}</small>
         </span>
       ))}
     </div>
@@ -52,6 +61,8 @@ function Countdown({ date }: { date: string }) {
 }
 export function Today({ onAdd, onOpen }: { onAdd: () => void; onOpen: (i: Item) => void }) {
   const items = useStore((s) => s.data.items);
+  const focusIds = useStore((s) => s.data.focusIds);
+  const focused = upcoming(items).filter((item) => focusIds?.includes(item.id));
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [limits, setLimits] = useState<Record<string, number>>({});
@@ -75,6 +86,17 @@ export function Today({ onAdd, onOpen }: { onAdd: () => void; onOpen: (i: Item) 
   let rowIndex = 0;
   return (
     <div className="today-view">
+      {focused.length > 0 && (
+        <section className="today-group">
+          <h2 className="group-label">{t('Your focus')}</h2>
+          {focused.map((item) => (
+            <button className="archive-item" key={item.id} onClick={() => onOpen(item)}>
+              <b>{item.title}</b>
+              <DueChip item={item} />
+            </button>
+          ))}
+        </section>
+      )}
       {next && (
         <motion.section
           key={`${next.id}-${count}`}
@@ -85,14 +107,8 @@ export function Today({ onAdd, onOpen }: { onAdd: () => void; onOpen: (i: Item) 
         >
           <div className="between">
             <span className="eyebrow">
-              <span className="live-dot" /> Next up ·{' '}
-              {isSubscription(next)
-                ? 'Renewal'
-                : ['applied', 'interview'].includes(next.status)
-                  ? 'Follow-up'
-                  : next.kind === 'study'
-                    ? 'Study'
-                    : 'Job'}
+              <span className="live-dot" />
+              {t('Next up \u00B7')} {eventTitle(itemEvents(next)[0])}
             </span>
             <span className="next-date">{format(parseISO(dueDate(next)!), 'MMM d')}</span>
           </div>
@@ -101,16 +117,17 @@ export function Today({ onAdd, onOpen }: { onAdd: () => void; onOpen: (i: Item) 
           </button>
           <p>{isSubscription(next) ? next.vendor : next.organization}</p>
           <div className="between hero-bottom">
-            <Countdown date={dueDate(next)!} />
+            <Countdown date={dueDate(next)!} at={eventInstant(itemEvents(next)[0])} />
             <Button onClick={() => onOpen(next)}>
-              View details <ArrowUpRight size={13} />
+              {t('View details')}
+              <ArrowUpRight size={13} />
             </Button>
           </div>
         </motion.section>
       )}
       <div className="today-toolbar">
         <Segments
-          label="Filter items"
+          label={t('Filter items')}
           value={filter}
           onChange={(v) => {
             setFilter(v);
@@ -126,25 +143,25 @@ export function Today({ onAdd, onOpen }: { onAdd: () => void; onOpen: (i: Item) 
         <div className="search-field">
           <Search size={14} />
           <input
-            aria-label="Search items"
+            aria-label={t('Search items')}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
               setLimits({});
             }}
-            placeholder="Find something…"
+            placeholder={t('Find something\u2026')}
           />
         </div>
       </div>
       {all.length === 0 ? (
         <EmptyState
-          title={query ? 'Nothing by that name' : 'A little space for what’s next'}
+          title={query ? t('Nothing by that name') : t('A little space for what\u2019s next')}
           description={
             query
-              ? 'Try another title or organization.'
-              : 'Add a deadline or renewal. We’ll keep it on your radar.'
+              ? t('Try another title or organization.')
+              : t('Add a deadline or renewal. We\u2019ll keep it on your radar.')
           }
-          action={<Button onClick={onAdd}>Add an item</Button>}
+          action={<Button onClick={onAdd}>{t('Add an item')}</Button>}
         />
       ) : (
         Object.entries(groups).map(
@@ -152,7 +169,7 @@ export function Today({ onAdd, onOpen }: { onAdd: () => void; onOpen: (i: Item) 
             group.length > 0 && (
               <section className="today-group" key={name}>
                 <h2 className={`group-label ${name === 'Overdue' ? 'overdue' : ''}`}>
-                  {name} <span>{group.length}</span>
+                  {t(name)} <span>{group.length}</span>
                 </h2>
                 <div>
                   {group.slice(0, limits[name] ?? 12).map((item) => {
@@ -176,18 +193,35 @@ export function Today({ onAdd, onOpen }: { onAdd: () => void; onOpen: (i: Item) 
                             <small>
                               {isSubscription(item)
                                 ? item.vendor
-                                : item.organization || 'Application'}{' '}
+                                : item.organization || t('Application')}{' '}
                               <span className="row-dot">·</span>{' '}
-                              {isSubscription(item) ? money(item.cost) : item.status}
+                              {isSubscription(item) ? money(item.cost) : t(item.status)}
                             </small>
                           </span>
                           <DueChip item={item} />
                         </button>
                         <div className="row-actions">
+                          <IconButton
+                            label={t(
+                              focusIds?.includes(item.id) ? 'Unpin {0}' : 'Pin {0} to focus',
+                              item.title,
+                            )}
+                            disabled={!focusIds?.includes(item.id) && (focusIds?.length ?? 0) >= 3}
+                            onClick={() => {
+                              void commit((state) => ({
+                                ...state,
+                                focusIds: state.focusIds?.includes(item.id)
+                                  ? state.focusIds.filter((id) => id !== item.id)
+                                  : [...(state.focusIds ?? []), item.id],
+                              }));
+                            }}
+                          >
+                            <Pin size={14} />
+                          </IconButton>
                           {!isSubscription(item) &&
                             !['applied', 'interview'].includes(item.status) && (
                               <IconButton
-                                label={`Mark ${item.title} applied`}
+                                label={t('Mark {0} applied', item.title)}
                                 onClick={() => {
                                   void updateItem(item.id, (i) =>
                                     isSubscription(i) ? i : applyStatus(i, 'applied'),
@@ -198,7 +232,7 @@ export function Today({ onAdd, onOpen }: { onAdd: () => void; onOpen: (i: Item) 
                               </IconButton>
                             )}
                           <IconButton
-                            label={`Snooze ${item.title} 1 day`}
+                            label={t('Snooze {0} 1 day', item.title)}
                             onClick={() => {
                               void updateItem(item.id, (i) => snooze(i));
                             }}
@@ -207,14 +241,14 @@ export function Today({ onAdd, onOpen }: { onAdd: () => void; onOpen: (i: Item) 
                           </IconButton>
                           {item.url && (
                             <IconButton
-                              label={`Open ${item.title} link`}
+                              label={t('Open {0} link', item.title)}
                               onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
                             >
                               <ArrowUpRight size={14} />
                             </IconButton>
                           )}
                           <IconButton
-                            label={`Archive ${item.title}`}
+                            label={t('Archive {0}', item.title)}
                             onClick={() => {
                               void archiveItem(item.id);
                             }}
@@ -231,7 +265,9 @@ export function Today({ onAdd, onOpen }: { onAdd: () => void; onOpen: (i: Item) 
                       className="show-more"
                       onClick={() => setLimits((s) => ({ ...s, [name]: (s[name] ?? 12) + 24 }))}
                     >
-                      Show more · {group.length - (limits[name] ?? 12)} remaining
+                      {t('Show more \u00B7')}
+                      {group.length - (limits[name] ?? 12)}
+                      {t('remaining')}
                     </Button>
                   )}
                 </div>

@@ -1,14 +1,18 @@
+import { formatDate as format } from '../../ui/i18n';
+import { t } from '../../ui/i18n';
+import { EventEditor } from './EventEditor';
+import { SubscriptionHistory } from './SubscriptionHistory';
+import { billingAnchor } from '../../shared/dates';
 import { useState } from 'react';
 import { nanoid } from 'nanoid';
 import { Archive, ArrowUpRight, Plus, RotateCcw, Trash2 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
 import { Button, Chip, IconButton, KindIcon, Modal, ProgressRing, Tick } from '../../ui/primitives';
 import { applyStatus, isApplication, isSubscription } from '../../shared/selectors';
 import { itemSchema, statuses, cycles, urlSchema } from '../../shared/schema';
 import { checklistTemplate } from '../../shared/templates';
-import { archiveItem, commit, updateItem, useStore } from '../../shared/store';
+import { archiveItem, updateItem, useStore } from '../../shared/store';
 import type { Application, Item, Subscription } from '../../shared/types';
-
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="field">
@@ -19,6 +23,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: () => void }) {
   const currency = useStore((s) => s.data.settings.defaultCurrency);
+  const [baseline] = useState(original);
   const [draft, setDraft] = useState(original);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -36,20 +41,47 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
     e.preventDefault();
     const parsed = itemSchema.safeParse({
       ...draft,
+      ...(sub &&
+      (sub.nextRenewal !== (baseline as Subscription).nextRenewal ||
+        sub.cycle !== (baseline as Subscription).cycle)
+        ? {
+            billingAnchor: {
+              ...billingAnchor(sub.nextRenewal),
+              endOfMonth: sub.billingAnchor?.endOfMonth ?? false,
+            },
+          }
+        : {}),
       title: draft.title.trim(),
       updatedAt: new Date().toISOString(),
     });
     if (!parsed.success) {
-      setError(`${parsed.error.issues[0].path.join(' · ')}: ${parsed.error.issues[0].message}`);
+      setError(
+        t('{0}: {1}', parsed.error.issues[0].path.join(' · '), parsed.error.issues[0].message),
+      );
       return;
     }
     setSaving(true);
     const changes = Object.fromEntries(
       Object.entries(parsed.data).filter(
-        ([key, value]) => JSON.stringify(value) !== JSON.stringify(Reflect.get(original, key)),
+        ([key, value]) => JSON.stringify(value) !== JSON.stringify(Reflect.get(baseline, key)),
       ),
     );
+    let conflicted = false;
     const ok = await updateItem(original.id, (current) => {
+      if (
+        current.deletedAt ||
+        Object.entries(changes).some(
+          ([key, value]) =>
+            key !== 'updatedAt' &&
+            key !== 'statusHistory' &&
+            JSON.stringify(Reflect.get(current, key)) !==
+              JSON.stringify(Reflect.get(baseline, key)) &&
+            JSON.stringify(Reflect.get(current, key)) !== JSON.stringify(value),
+        )
+      ) {
+        conflicted = true;
+        return current;
+      }
       let result = { ...current, ...changes } as Item;
       if (isApplication(result) && isApplication(current) && result.status !== current.status) {
         result = {
@@ -63,11 +95,30 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
         if (result.status === 'applied' && !('followUpAt' in changes))
           result.followUpAt = applyStatus(current, 'applied').followUpAt;
       }
+      if (
+        isSubscription(result) &&
+        isSubscription(current) &&
+        JSON.stringify(result.cost) !== JSON.stringify(current.cost)
+      ) {
+        result = {
+          ...result,
+          priceHistory: [
+            ...(current.priceHistory ?? [{ at: current.createdAt, cost: current.cost }]),
+            { at: new Date().toISOString(), cost: result.cost },
+          ].slice(-500),
+        };
+      }
       return result;
     });
     setSaving(false);
-    if (ok) onClose();
-    else setError('Could not save this item. Please try again.');
+    if (conflicted)
+      setError(
+        t(
+          'This item changed in another window. Reopen it to review the latest details before saving.',
+        ),
+      );
+    else if (ok) onClose();
+    else setError(t('Could not save this item. Please try again.'));
   }
   const optional = (s: string) => s || undefined;
   return (
@@ -78,8 +129,8 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
         onOpenChange={(v) => {
           if (!v && !saving) onClose();
         }}
-        title="The details"
-        description="One step closer to what’s next."
+        title={t('The details')}
+        description={t('One step closer to what\u2019s next.')}
       >
         <form
           className="form-stack item-form"
@@ -93,26 +144,27 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
               <KindIcon kind={draft.kind} />
               <Chip>
                 {draft.kind === 'job'
-                  ? 'Job application'
+                  ? t('Job application')
                   : draft.kind === 'study'
-                    ? 'Study application'
-                    : 'Subscription'}
+                    ? t('Study application')
+                    : t('Subscription')}
               </Chip>
             </div>
             {draft.url && (
               <a href={draft.url} target="_blank" rel="noreferrer" className="inline text-xs">
-                Open page <ArrowUpRight size={13} />
+                {t('Open page')}
+                <ArrowUpRight size={13} />
               </a>
             )}
           </div>
-          <Field label="Title">
+          <Field label={t('Title')}>
             <input
               value={draft.title}
               onChange={(e) => set({ title: e.target.value })}
               maxLength={500}
             />
           </Field>
-          <Field label="Page link">
+          <Field label={t('Page link')}>
             <input
               type="url"
               value={draft.url ?? ''}
@@ -122,31 +174,31 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
           {app && (
             <>
               <div className="form-grid">
-                <Field label="Organization">
+                <Field label={t('Organization')}>
                   <input
                     value={app.organization}
                     onChange={(e) => patchApp({ organization: e.target.value })}
                   />
                 </Field>
-                <Field label="Role or program">
+                <Field label={t('Role or program')}>
                   <input
                     value={app.roleOrProgram}
                     onChange={(e) => patchApp({ roleOrProgram: e.target.value })}
                   />
                 </Field>
-                <Field label="Status">
+                <Field label={t('Status')}>
                   <select
                     value={app.status}
                     onChange={(e) => patchApp({ status: e.target.value as Application['status'] })}
                   >
                     {statuses.map((s) => (
                       <option key={s} value={s}>
-                        {s}
+                        {t(s)}
                       </option>
                     ))}
                   </select>
                 </Field>
-                <Field label="Priority">
+                <Field label={t('Priority')}>
                   <select
                     value={app.priority}
                     onChange={(e) =>
@@ -154,31 +206,33 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                     }
                   >
                     {['low', 'medium', 'high'].map((s) => (
-                      <option key={s}>{s}</option>
+                      <option key={s} value={s}>
+                        {t(s)}
+                      </option>
                     ))}
                   </select>
                 </Field>
-                <Field label="Deadline">
+                <Field label={t('Deadline')}>
                   <input
                     type="date"
                     value={app.deadline ?? ''}
                     onChange={(e) => patchApp({ deadline: optional(e.target.value) })}
                   />
                 </Field>
-                <Field label="Follow-up date">
+                <Field label={t('Follow-up date')}>
                   <input
                     type="date"
                     value={app.followUpAt ?? ''}
                     onChange={(e) => patchApp({ followUpAt: optional(e.target.value) })}
                   />
                 </Field>
-                <Field label="Country">
+                <Field label={t('Country')}>
                   <input
                     value={app.country ?? ''}
                     onChange={(e) => patchApp({ country: optional(e.target.value) })}
                   />
                 </Field>
-                <Field label="Application fee · optional">
+                <Field label={t('Application fee \u00B7 optional')}>
                   <input
                     type="number"
                     min="0"
@@ -197,7 +251,7 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                   />
                 </Field>
                 {app.fee && (
-                  <Field label="Fee currency">
+                  <Field label={t('Fee currency')}>
                     <input
                       value={app.fee.currency}
                       maxLength={3}
@@ -210,9 +264,10 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                   </Field>
                 )}
               </div>
+              <EventEditor events={app.events ?? []} onChange={(events) => patchApp({ events })} />
               <section className="editor-section">
                 <div className="between">
-                  <h3>Checklist</h3>
+                  <h3>{t('Checklist')}</h3>
                   <ProgressRing
                     done={app.checklist.filter((c) => c.done).length}
                     total={app.checklist.length}
@@ -222,7 +277,7 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                   <div className="checklist-row" key={c.id}>
                     <Tick
                       checked={c.done}
-                      label={`Complete ${c.label}`}
+                      label={t('Complete {0}', c.label)}
                       onChange={(done) =>
                         patchApp({
                           checklist: app.checklist.map((x) => (x.id === c.id ? { ...x, done } : x)),
@@ -231,7 +286,7 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                     />
                     <input
                       className="checklist-input"
-                      aria-label={`Edit task ${c.label}`}
+                      aria-label={t('Edit task {0}', c.label)}
                       value={c.label}
                       onChange={(e) =>
                         patchApp({
@@ -242,7 +297,7 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                       }
                     />
                     <IconButton
-                      label={`Remove ${c.label}`}
+                      label={t('Remove {0}', c.label)}
                       onClick={() =>
                         patchApp({ checklist: app.checklist.filter((x) => x.id !== c.id) })
                       }
@@ -263,7 +318,8 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                       })
                     }
                   >
-                    <Plus size={12} /> Add task
+                    <Plus size={12} />
+                    {t('Add task')}
                   </Button>
                   <Button
                     variant="ghost"
@@ -277,13 +333,14 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                       });
                     }}
                   >
-                    <RotateCcw size={12} /> Apply template
+                    <RotateCcw size={12} />
+                    {t('Apply template')}
                   </Button>
                 </div>
               </section>
               <section className="editor-section">
                 <div className="between">
-                  <h3>Documents</h3>
+                  <h3>{t('Documents')}</h3>
                   <Button
                     variant="ghost"
                     onClick={() =>
@@ -292,14 +349,15 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                       })
                     }
                   >
-                    <Plus size={12} /> Add link
+                    <Plus size={12} />
+                    {t('Add link')}
                   </Button>
                 </div>
                 {app.documents.map((d) => (
                   <div className="document-row document-link-row" key={d.id}>
                     <input
-                      aria-label="Document label"
-                      placeholder="Document name"
+                      aria-label={t('Document label')}
+                      placeholder={t('Document name')}
                       value={d.label}
                       onChange={(e) =>
                         patchApp({
@@ -310,9 +368,9 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                       }
                     />
                     <input
-                      aria-label="Document URL"
+                      aria-label={t('Document URL')}
                       type="url"
-                      placeholder="https://"
+                      placeholder={'https://'}
                       value={d.url}
                       onChange={(e) =>
                         patchApp({
@@ -328,7 +386,7 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                         href={d.url}
                         target="_blank"
                         rel="noreferrer"
-                        aria-label={`Open ${d.label || 'document'}`}
+                        aria-label={t('Open {0}', d.label || 'document')}
                       >
                         <ArrowUpRight size={13} />
                       </a>
@@ -336,7 +394,7 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                       <span />
                     )}
                     <IconButton
-                      label="Remove document"
+                      label={t('Remove document')}
                       onClick={() =>
                         patchApp({ documents: app.documents.filter((x) => x.id !== d.id) })
                       }
@@ -349,7 +407,7 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
               {app.kind === 'study' && (
                 <section className="editor-section">
                   <div className="between">
-                    <h3>Recommenders</h3>
+                    <h3>{t('Recommenders')}</h3>
                     <Button
                       variant="ghost"
                       onClick={() =>
@@ -361,14 +419,15 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                         })
                       }
                     >
-                      <Plus size={12} /> Add person
+                      <Plus size={12} />
+                      {t('Add person')}
                     </Button>
                   </div>
                   {app.recommenders?.map((r) => (
                     <div className="document-row" key={r.id}>
                       <input
-                        aria-label="Recommender name"
-                        placeholder="Name"
+                        aria-label={t('Recommender name')}
+                        placeholder={t('Name')}
                         value={r.name}
                         onChange={(e) =>
                           patchApp({
@@ -379,7 +438,7 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                         }
                       />
                       <select
-                        aria-label={`Recommendation status for ${r.name}`}
+                        aria-label={t('Recommendation status for {0}', r.name)}
                         value={r.status}
                         onChange={(e) =>
                           patchApp({
@@ -392,11 +451,13 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                         }
                       >
                         {['to-ask', 'asked', 'agreed', 'submitted'].map((s) => (
-                          <option key={s}>{s}</option>
+                          <option key={s} value={s}>
+                            {t(s)}
+                          </option>
                         ))}
                       </select>
                       <IconButton
-                        label="Remove recommender"
+                        label={t('Remove recommender')}
                         onClick={() =>
                           patchApp({ recommenders: app.recommenders!.filter((x) => x.id !== r.id) })
                         }
@@ -411,20 +472,21 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
           )}
           {sub && (
             <>
+              <SubscriptionHistory item={sub} onChange={patchSub} />
               <div className="form-grid">
-                <Field label="Vendor">
+                <Field label={t('Vendor')}>
                   <input
                     value={sub.vendor}
                     onChange={(e) => patchSub({ vendor: e.target.value })}
                   />
                 </Field>
-                <Field label="Category">
+                <Field label={t('Category')}>
                   <input
                     value={sub.category}
                     onChange={(e) => patchSub({ category: e.target.value })}
                   />
                 </Field>
-                <Field label="Amount per cycle">
+                <Field label={t('Amount per cycle')}>
                   <input
                     type="number"
                     min="0"
@@ -435,7 +497,7 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                     }
                   />
                 </Field>
-                <Field label="Currency">
+                <Field label={t('Currency')}>
                   <input
                     value={sub.cost.currency}
                     maxLength={3}
@@ -444,41 +506,75 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                     }
                   />
                 </Field>
-                <Field label="Billing cycle">
+                <Field label={t('Billing cycle')}>
                   <select
                     value={sub.cycle}
                     onChange={(e) => patchSub({ cycle: e.target.value as Subscription['cycle'] })}
                   >
                     {cycles.map((c) => (
-                      <option key={c}>{c}</option>
+                      <option key={c} value={c}>
+                        {t(c)}
+                      </option>
                     ))}
                   </select>
                 </Field>
-                <Field label="Status">
+                <Field label={t('Status')}>
                   <select
                     value={sub.status}
                     onChange={(e) => patchSub({ status: e.target.value as Subscription['status'] })}
                   >
                     {['active', 'trial', 'cancelling', 'cancelled'].map((s) => (
-                      <option key={s}>{s}</option>
+                      <option key={s} value={s}>
+                        {t(s)}
+                      </option>
                     ))}
                   </select>
                 </Field>
-                <Field label="Next renewal">
+                <Field label={t('Next renewal')}>
                   <input
                     type="date"
                     value={sub.nextRenewal}
                     onChange={(e) => patchSub({ nextRenewal: e.target.value })}
                   />
                 </Field>
-                <Field label="Trial ends">
+                <Field label={t('Billing date rule')}>
+                  <select
+                    value={sub.billingAnchor?.endOfMonth ? 'last' : 'day'}
+                    onChange={(e) =>
+                      patchSub({
+                        billingAnchor: {
+                          ...(sub.billingAnchor ?? billingAnchor(sub.nextRenewal)),
+                          endOfMonth: e.target.value === 'last',
+                        },
+                      })
+                    }
+                  >
+                    <option value="day">{t('Original day, clamped in shorter months')}</option>
+                    <option value="last">{t('Last day of the month')}</option>
+                  </select>
+                </Field>
+                {sub.status === 'cancelling' && (
+                  <Field label={t('Planned cancellation date')}>
+                    <input
+                      type="date"
+                      value={sub.cancelAt ?? ''}
+                      onChange={(e) => patchSub({ cancelAt: e.target.value || undefined })}
+                    />
+                    <small>
+                      {t(
+                        'Forecasts exclude charges on or after this date. Confirm cancellation with the provider yourself.',
+                      )}
+                    </small>
+                  </Field>
+                )}
+                <Field label={t('Trial ends')}>
                   <input
                     type="date"
                     value={sub.trialEndsAt ?? ''}
                     onChange={(e) => patchSub({ trialEndsAt: optional(e.target.value) })}
                   />
                 </Field>
-                <Field label="Remind days before">
+                <Field label={t('Remind days before')}>
                   <input
                     type="number"
                     min="0"
@@ -488,7 +584,7 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
                   />
                 </Field>
               </div>
-              <Field label="Cancellation link">
+              <Field label={t('Cancellation link')}>
                 <input
                   type="url"
                   value={sub.cancelUrl ?? ''}
@@ -498,28 +594,28 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
               <Tick
                 checked={sub.unused ?? false}
                 onChange={(unused) => patchSub({ unused })}
-                label="I don't use this · mark as a cancel candidate"
+                label={t("I don't use this \u00B7 mark as a cancel candidate")}
               />
             </>
           )}
-          <Field label="Tags · separated by commas">
+          <Field label={t('Tags \u00B7 separated by commas')}>
             <input
               value={draft.tags.join(', ')}
               onChange={(e) => set({ tags: e.target.value.split(',').map((s) => s.trimStart()) })}
               onBlur={() => set({ tags: draft.tags.map((s) => s.trim()).filter(Boolean) })}
             />
           </Field>
-          <Field label="Notes">
+          <Field label={t('Notes')}>
             <textarea
               value={draft.notes ?? ''}
-              placeholder="A thought, a contact, a next step…"
+              placeholder={t('A thought, a contact, a next step\u2026')}
               onChange={(e) => set({ notes: e.target.value })}
               rows={4}
             />
           </Field>
           {app && app.statusHistory.length > 0 && (
             <section className="editor-section">
-              <h3>Activity</h3>
+              <h3>{t('Activity')}</h3>
               <ol className="history">
                 {app.statusHistory.map((h, n) => (
                   <li key={`${h.at}-${n}`}>
@@ -532,12 +628,13 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
             </section>
           )}
           <small>
-            Added {format(parseISO(draft.createdAt), 'MMM d, yyyy')} · Updated{' '}
-            {format(parseISO(draft.updatedAt), 'MMM d, yyyy')}
+            {t('Added')}
+            {format(parseISO(draft.createdAt), 'MMM d, yyyy')}
+            {t('\u00B7 Updated')} {format(parseISO(draft.updatedAt), 'MMM d, yyyy')}
           </small>
           {error && (
             <p className="error" role="alert">
-              {error}
+              {t(error)}
             </p>
           )}
           <div className="form-actions drawer-actions">
@@ -551,15 +648,15 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
               }}
             >
               <Archive size={13} />
-              {original.archivedAt ? 'Restore' : 'Archive'}
+              {original.archivedAt ? t('Restore') : t('Archive')}
             </Button>
-            <IconButton label="Delete item permanently" onClick={() => setConfirm(true)}>
+            <IconButton label={t('Move item to trash')} onClick={() => setConfirm(true)}>
               <Trash2 size={14} />
             </IconButton>
             <div className="spacer" />
-            <Button onClick={onClose}>Cancel</Button>
+            <Button onClick={onClose}>{t('Cancel')}</Button>
             <Button variant="primary" type="submit" disabled={saving}>
-              {saving ? 'Saving…' : 'Save changes'}
+              {saving ? t('Saving\u2026') : t('Save changes')}
             </Button>
           </div>
         </form>
@@ -567,21 +664,25 @@ export function ItemDrawer({ item: original, onClose }: { item: Item; onClose: (
       <Modal
         open={confirm}
         onOpenChange={setConfirm}
-        title="Delete this item?"
-        description="This permanently removes the item and all its details."
+        title={t('Move this item to trash?')}
+        description={t('You can restore it later from Trash. Reminders stop while it is there.')}
       >
         <div className="form-actions">
-          <Button onClick={() => setConfirm(false)}>Keep item</Button>
+          <Button onClick={() => setConfirm(false)}>{t('Keep item')}</Button>
           <Button
             variant="danger"
             onClick={async () => {
               if (
-                await commit((s) => ({ ...s, items: s.items.filter((i) => i.id !== original.id) }))
+                await updateItem(original.id, (item) => ({
+                  ...item,
+                  deletedAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                }))
               )
                 onClose();
             }}
           >
-            Delete item
+            {t('Move to trash')}
           </Button>
         </div>
       </Modal>

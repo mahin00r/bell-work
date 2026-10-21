@@ -1,14 +1,15 @@
+import { formatDate as format } from '../../ui/i18n';
+import { t } from '../../ui/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { animate } from 'motion';
 import { ArrowUpRight, Plus, Repeat2, Wallet } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
 import { Button, Chip, EmptyState, KindIcon, Segments } from '../../ui/primitives';
 import { isSubscription, spend } from '../../shared/selectors';
-import { money } from '../../shared/money';
+import { formatMoney as money } from '../../ui/i18n';
 import { useStore } from '../../shared/store';
 import type { Item } from '../../shared/types';
 import { useReducedMotion } from '../../ui/motion';
-
 export function AnimatedMoney({ amount, currency }: { amount: number; currency: string }) {
   const [value, setValue] = useState(amount);
   const previous = useRef(amount);
@@ -33,6 +34,7 @@ export function Subscriptions({ onOpen, onAdd }: { onOpen: (i: Item) => void; on
     .filter(
       (i) =>
         !i.archivedAt &&
+        !i.deletedAt &&
         (filter === 'all'
           ? i.status !== 'cancelled'
           : filter === 'unused'
@@ -47,30 +49,32 @@ export function Subscriptions({ onOpen, onAdd }: { onOpen: (i: Item) => void; on
       <div className="metrics two">
         <section className="metric">
           <span>
-            <Wallet size={15} /> Monthly commitment
+            <Wallet size={15} />
+            {t('Monthly commitment')}
           </span>
           {totals.map(([currency, amount]) => (
             <strong key={currency}>
               <AnimatedMoney currency={currency} amount={amount} />
             </strong>
           ))}
-          <small>Normalized across all billing cycles</small>
+          <small>{t('Normalized across all billing cycles')}</small>
         </section>
         <section className="metric">
           <span>
-            <Repeat2 size={15} /> Yearly outlook
+            <Repeat2 size={15} />
+            {t('Yearly outlook')}
           </span>
           {totals.map(([currency, amount]) => (
             <strong key={currency}>
               <AnimatedMoney currency={currency} amount={amount * 12} />
             </strong>
           ))}
-          <small>At your current subscription pace</small>
+          <small>{t('At your current subscription pace')}</small>
         </section>
       </div>
       <div className="view-toolbar">
         <Segments
-          label="Subscription filter"
+          label={t('Subscription filter')}
           value={filter}
           onChange={setFilter}
           values={[
@@ -79,25 +83,29 @@ export function Subscriptions({ onOpen, onAdd }: { onOpen: (i: Item) => void; on
             { value: 'cancelled', label: 'Cancelled' },
           ]}
         />
-        <span className="muted text-xs">{items.length} subscriptions</span>
+        <span className="muted text-xs">
+          {items.length}
+          {t('subscriptions')}
+        </span>
       </div>
       {!items.length ? (
         <EmptyState
           title={
             filter === 'unused'
-              ? 'Every subscription earns its place'
+              ? t('Every subscription earns its place')
               : filter === 'cancelled'
-                ? 'No cancelled subscriptions'
-                : 'A clearer picture of your spending'
+                ? t('No cancelled subscriptions')
+                : t('A clearer picture of your spending')
           }
           description={
             filter === 'unused'
-              ? 'Flag an unused subscription in its details to review it here.'
-              : 'Add a subscription to see upcoming renewals and what they add up to.'
+              ? t('Flag an unused subscription in its details to review it here.')
+              : t('Add a subscription to see upcoming renewals and what they add up to.')
           }
           action={
             <Button onClick={onAdd}>
-              <Plus size={14} /> Add subscription
+              <Plus size={14} />
+              {t('Add subscription')}
             </Button>
           }
         />
@@ -106,13 +114,13 @@ export function Subscriptions({ onOpen, onAdd }: { onOpen: (i: Item) => void; on
           <table>
             <thead>
               <tr>
-                <th>Subscription</th>
-                <th>Cost / cycle</th>
-                <th>Next renewal</th>
-                <th>Status</th>
-                <th>Category</th>
+                <th>{t('Subscription')}</th>
+                <th>{t('Cost / cycle')}</th>
+                <th>{t('Next renewal')}</th>
+                <th>{t('Status')}</th>
+                <th>{t('Category')}</th>
                 <th>
-                  <span className="sr-only">Actions</span>
+                  <span className="sr-only">{t('Actions')}</span>
                 </th>
               </tr>
             </thead>
@@ -130,12 +138,15 @@ export function Subscriptions({ onOpen, onAdd }: { onOpen: (i: Item) => void; on
                   </td>
                   <td>
                     <b>{money(i.cost)}</b>
-                    <small>{i.cycle}</small>
+                    <small>{t(i.cycle)}</small>
                   </td>
                   <td>
                     {format(parseISO(i.nextRenewal), 'MMM d, yyyy')}
                     {i.trialEndsAt && i.status === 'trial' && (
-                      <small>Trial ends {format(parseISO(i.trialEndsAt), 'MMM d')}</small>
+                      <small>
+                        {t('Trial ends')}
+                        {format(parseISO(i.trialEndsAt), 'MMM d')}
+                      </small>
                     )}
                   </td>
                   <td>
@@ -144,7 +155,7 @@ export function Subscriptions({ onOpen, onAdd }: { onOpen: (i: Item) => void; on
                         i.status === 'trial' ? 'accent' : i.status === 'active' ? 'success' : ''
                       }
                     >
-                      {i.status}
+                      {t(i.status)}
                     </Chip>
                   </td>
                   <td className="muted">{i.category}</td>
@@ -154,7 +165,8 @@ export function Subscriptions({ onOpen, onAdd }: { onOpen: (i: Item) => void; on
                         variant="ghost"
                         onClick={() => window.open(i.cancelUrl, '_blank', 'noopener,noreferrer')}
                       >
-                        Manage <ArrowUpRight size={13} />
+                        {t('Manage')}
+                        <ArrowUpRight size={13} />
                       </Button>
                     )}
                   </td>

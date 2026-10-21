@@ -1,3 +1,4 @@
+import { t } from '../../ui/i18n';
 import { useState } from 'react';
 import {
   DndContext,
@@ -19,7 +20,6 @@ import type { Application, Item, Status } from '../../shared/types';
 import { motion } from 'motion/react';
 import { snappy, useReducedMotion } from '../../ui/motion';
 import { Milestone, useMilestones } from '../../ui/Milestone';
-
 const label = (status: string) => status.charAt(0).toUpperCase() + status.slice(1);
 const keyboardCoordinates: KeyboardCoordinateGetter = (event, { currentCoordinates }) => {
   if (event.code === 'ArrowRight' || event.code === 'ArrowLeft') {
@@ -69,7 +69,7 @@ function Card({
           {...listeners}
           {...attributes}
           className="drag-handle"
-          aria-label={`Drag ${item.title}`}
+          aria-label={t('Drag {0}', item.title)}
         >
           <GripVertical size={15} />
         </button>
@@ -77,17 +77,20 @@ function Card({
       <button className="card-title" onClick={() => onOpen(item)}>
         {item.title}
       </button>
-      <p>{item.organization || 'Application'}</p>
+      <p>{item.organization || t('Application')}</p>
       <div className="card-footer">
         <DueChip item={item} />
-        <span className={`priority ${item.priority}`} title={`${label(item.priority)} priority`} />
+        <span
+          className={`priority ${item.priority}`}
+          title={t('{0} priority', label(item.priority))}
+        />
         <ProgressRing
           done={item.checklist.filter((c) => c.done).length}
           total={item.checklist.length}
         />
       </div>
       <label className="sr-only" htmlFor={`status-${item.id}`}>
-        Move {item.title} to status
+        {t('Move {0} to status', item.title)}
       </label>
       <select
         id={`status-${item.id}`}
@@ -99,7 +102,7 @@ function Card({
       >
         {statuses.map((s) => (
           <option key={s} value={s}>
-            {label(s)}
+            {t(label(s))}
           </option>
         ))}
       </select>
@@ -120,25 +123,33 @@ function Column({
   celebrating: Set<string>;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
+  const [limit, setLimit] = useState(50);
   return (
     <section
       ref={setNodeRef}
       className={`board-column ${isOver ? 'drop-target' : ''}`}
-      aria-label={`${label(status)} column`}
+      aria-label={t('{0} column', label(status))}
     >
       <div className="column-heading">
         <span className={`status-dot ${status}`} />
-        <h2>{label(status)}</h2>
+        <h2>{t(label(status))}</h2>
         <span>{items.length}</span>
-        <button onClick={onAdd} aria-label={`Add an application`}>
+        <button onClick={onAdd} aria-label={t('Add an application')}>
           <Plus size={14} />
         </button>
       </div>
       <div className="column-cards">
-        {items.map((i) => (
+        {items.slice(0, limit).map((i) => (
           <Card item={i} key={i.id} onOpen={onOpen} celebrate={celebrating.has(i.id)} />
         ))}
-        {items.length === 0 && <p className="column-empty">A little room for possibility.</p>}
+        {items.length > limit && (
+          <Button variant="ghost" onClick={() => setLimit((current) => current + 50)}>
+            {t('Show 50 more')}
+          </Button>
+        )}
+        {items.length === 0 && (
+          <p className="column-empty">{t('A little room for possibility.')}</p>
+        )}
       </div>
     </section>
   );
@@ -149,7 +160,7 @@ export function Board({ onOpen, onAdd }: { onOpen: (i: Item) => void; onAdd: () 
   const [kind, setKind] = useState('all');
   const apps = items
     .filter(isApplication)
-    .filter((i) => !i.archivedAt && (kind === 'all' || kind === i.kind));
+    .filter((i) => !i.archivedAt && !i.deletedAt && (kind === 'all' || kind === i.kind));
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: keyboardCoordinates }),
@@ -162,7 +173,7 @@ export function Board({ onOpen, onAdd }: { onOpen: (i: Item) => void; onAdd: () 
     <>
       <div className="view-toolbar">
         <Segments
-          label="Application kind"
+          label={t('Application kind')}
           value={kind}
           onChange={setKind}
           values={[
@@ -171,15 +182,21 @@ export function Board({ onOpen, onAdd }: { onOpen: (i: Item) => void; onAdd: () 
             { value: 'study', label: 'Study' },
           ]}
         />
-        <span className="muted text-xs">{apps.length} possibilities, one place</span>
+        <span className="muted text-xs">
+          {apps.length}
+          {t('possibilities, one place')}
+        </span>
       </div>
       {apps.length === 0 ? (
         <EmptyState
-          title="Your next chapter is unwritten"
-          description="Save a job or study opportunity, then move it forward one step at a time."
+          title={t('Your next chapter is unwritten')}
+          description={t(
+            'Save a job or study opportunity, then move it forward one step at a time.',
+          )}
           action={
             <Button variant="primary" onClick={onAdd}>
-              <Plus size={14} /> Add application
+              <Plus size={14} />
+              {t('Add application')}
             </Button>
           }
         />

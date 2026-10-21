@@ -7,7 +7,9 @@ function browser(url = 'https://example.org/jobs') {
     get: vi.fn().mockResolvedValue({ id: 12, title: 'Design fellow', url }),
     create: vi.fn().mockResolvedValue({}),
   };
-  const scripting = { executeScript: vi.fn().mockResolvedValue([{ result: 'Northwind Labs' }]) };
+  const scripting = {
+    executeScript: vi.fn().mockResolvedValue([{ result: { organization: 'Northwind Labs' } }]),
+  };
   vi.stubGlobal('chrome', {
     tabs,
     scripting,
@@ -25,6 +27,14 @@ it('reads the active page only when capture is requested', async () => {
   });
   expect(tabs.query).toHaveBeenCalledWith({ active: true, currentWindow: true });
   expect(scripting.executeScript).toHaveBeenCalledOnce();
+});
+it('uses the Firefox promise namespace when chrome is unavailable', async () => {
+  const { tabs } = browser();
+  const firefox = Reflect.get(globalThis, 'chrome');
+  vi.stubGlobal('browser', firefox);
+  vi.stubGlobal('chrome', undefined);
+  expect((await capturePage()).organization).toBe('Northwind Labs');
+  expect(tabs.query).toHaveBeenCalledOnce();
 });
 it('uses a hostname fallback and skips restricted pages', async () => {
   const { scripting } = browser();

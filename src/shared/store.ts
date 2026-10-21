@@ -6,14 +6,26 @@ interface Store {
   data: State;
   ready: boolean;
   error: string | null;
+  loadFailed: boolean;
 }
-export const useStore = create<Store>(() => ({ data: emptyState(), ready: false, error: null }));
+export const useStore = create<Store>(() => ({
+  data: emptyState(),
+  ready: false,
+  error: null,
+  loadFailed: false,
+}));
 export async function reload() {
   try {
-    useStore.setState({ data: await repository.get(), ready: true, error: null });
+    useStore.setState({
+      data: await repository.get(),
+      ready: true,
+      error: null,
+      loadFailed: false,
+    });
   } catch {
     useStore.setState({
       ready: true,
+      loadFailed: true,
       error:
         'Your data could not be loaded. Export a backup before changing anything, or try reopening Bell Work.',
     });
@@ -29,9 +41,10 @@ export function initializeStore() {
   }
   return reload();
 }
-export async function commit(change: (s: State) => State) {
+export async function commit(change: (s: State) => State, reason?: string) {
+  if (useStore.getState().loadFailed) return false;
   try {
-    const data = await repository.set(change);
+    const data = await repository.set(change, true, reason);
     useStore.setState({ data, error: null });
     return true;
   } catch {

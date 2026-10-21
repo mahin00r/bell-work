@@ -5,11 +5,22 @@ export default defineConfig({
   srcDir: 'src',
   imports: false,
   vite: () => ({ plugins: [react()], build: { modulePreload: false } }),
-  manifest: {
+  manifest: ({ browser }) => ({
     name: 'Bell Work',
     description:
-      'Track job applications, study applications, and subscriptions with reminders that never let a deadline slip.',
-    version: '1.0.0',
+      'Track applications, deadlines, interviews, and subscriptions with private, offline reminders.',
+    version: '2.0.0',
+    ...(browser === 'firefox'
+      ? {
+          browser_specific_settings: {
+            gecko: {
+              id: 'bell-work@mahin00r.github.io',
+              strict_min_version: '140.0',
+              data_collection_permissions: { required: ['none'] },
+            },
+          },
+        }
+      : { version_name: '2.0.0-beta.1' }),
     permissions: [
       'storage',
       'unlimitedStorage',
@@ -32,5 +43,5 @@ export default defineConfig({
       48: 'icons/icon-48.png',
       128: 'icons/icon-128.png',
     },
-  },
+  }),
 });

@@ -1,4 +1,5 @@
-import { daysUntil, nextCycle, today } from './dates';
+import { daysUntil, renewalDates, today } from './dates';
+import { eventDisplayDate, itemEvents } from './events';
 import { monthlyCost } from './money';
 import type { Application, Item, Subscription } from './types';
 
@@ -7,17 +8,16 @@ export const isSubscription = (i: Item): i is Subscription => i.kind === 'subscr
 export function actionable(i: Item) {
   return (
     !i.archivedAt &&
+    !i.deletedAt &&
     (isSubscription(i)
       ? i.status !== 'cancelled'
-      : !['accepted', 'rejected', 'withdrawn', 'offer'].includes(i.status))
+      : !['accepted', 'rejected', 'withdrawn'].includes(i.status) &&
+        (i.status !== 'offer' || itemEvents(i).length > 0))
   );
 }
 export function dueDate(i: Item) {
-  if (isSubscription(i))
-    return i.status === 'trial' && i.trialEndsAt && i.trialEndsAt <= i.nextRenewal
-      ? i.trialEndsAt
-      : i.nextRenewal;
-  return ['applied', 'interview'].includes(i.status) ? i.followUpAt : i.deadline;
+  const event = itemEvents(i)[0];
+  return event ? eventDisplayDate(event) : undefined;
 }
 export function upcoming(items: Item[]) {
   return items
@@ -45,12 +45,12 @@ export function spend(items: Item[]) {
   const totals: Record<string, number> = {};
   for (const i of items
     .filter(isSubscription)
-    .filter((s) => !s.archivedAt && s.status !== 'cancelled'))
+    .filter((s) => !s.archivedAt && !s.deletedAt && s.status !== 'cancelled'))
     totals[i.cost.currency] = (totals[i.cost.currency] ?? 0) + monthlyCost(i);
   return totals;
 }
 export function funnel(items: Item[]) {
-  const apps = items.filter(isApplication).filter((i) => !i.archivedAt);
+  const apps = items.filter(isApplication).filter((i) => !i.archivedAt && !i.deletedAt);
   return Object.fromEntries(
     ['saved', 'applied', 'interview', 'offer'].map((status) => [
       status,
@@ -63,15 +63,12 @@ export function funnel(items: Item[]) {
     ]),
   );
 }
-export function upcomingSpend(items: Item[], now = new Date()) {
+export function upcomingSpend(items: Item[], now = new Date(), horizon = 30) {
   const totals: Record<string, number> = {};
   for (const s of items.filter(isSubscription).filter(actionable)) {
-    let date = s.nextRenewal;
-    while (daysUntil(date, now) < 0) date = nextCycle(date, s.cycle);
-    while (daysUntil(date, now) < 30) {
-      totals[s.cost.currency] = (totals[s.cost.currency] ?? 0) + s.cost.amount;
-      date = nextCycle(date, s.cycle);
-    }
+    const occurrences = renewalDates(s, today(now), horizon).length;
+    if (occurrences)
+      totals[s.cost.currency] = (totals[s.cost.currency] ?? 0) + s.cost.amount * occurrences;
   }
   return totals;
 }

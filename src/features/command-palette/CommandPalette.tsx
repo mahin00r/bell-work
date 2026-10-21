@@ -1,3 +1,4 @@
+import { t } from '../../ui/i18n';
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, Download, LayoutGrid, Plus, Search, Sun } from 'lucide-react';
 import { EmptyState, Kbd, Modal } from '../../ui/primitives';
@@ -5,7 +6,16 @@ import { useStore, commit } from '../../shared/store';
 import { exportData } from '../../shared/export';
 import type { Item } from '../../shared/types';
 export type View =
-  'today' | 'board' | 'subscriptions' | 'timeline' | 'insights' | 'settings' | 'archive';
+  | 'today'
+  | 'board'
+  | 'subscriptions'
+  | 'timeline'
+  | 'insights'
+  | 'settings'
+  | 'archive'
+  | 'trash'
+  | 'review'
+  | 'library';
 export function CommandPalette({
   open,
   onOpenChange,
@@ -47,10 +57,32 @@ export function CommandPalette({
       run: onAdd,
     },
     ...(
-      ['today', 'board', 'subscriptions', 'timeline', 'insights', 'settings', 'archive'] as View[]
+      [
+        'today',
+        'board',
+        'subscriptions',
+        'timeline',
+        'insights',
+        'settings',
+        'archive',
+        'review',
+        'trash',
+        'library',
+      ] as View[]
     ).map((view) => ({
       id: view,
-      title: `Go to ${view === 'board' ? 'applications' : view}`,
+      title: t(
+        'Go to {0}',
+        t(
+          view === 'board'
+            ? 'Applications'
+            : view === 'review'
+              ? 'Weekly review'
+              : view === 'library'
+                ? 'All items'
+                : view.charAt(0).toUpperCase() + view.slice(1),
+        ),
+      ),
       detail: 'Navigate',
       icon: LayoutGrid,
       run: () => onView(view),
@@ -80,16 +112,20 @@ export function CommandPalette({
       },
     },
     ...items
-      .filter((i) => !i.archivedAt)
+      .filter((i) => !i.archivedAt && !i.deletedAt)
       .map((item) => ({
-        id: item.id,
+        id: `item:${item.id}`,
         title: item.title,
-        detail: `Jump to ${item.kind}`,
+        detail: t('Jump to {0}', t(item.kind)),
         icon: ArrowUpRight,
         run: () => onOpen(item),
       })),
   ]
-    .filter((a) => `${a.title} ${a.detail}`.toLowerCase().includes(query.toLowerCase()))
+    .filter((a) =>
+      `${a.title} ${a.detail} ${t(a.title)} ${t(a.detail)}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
+    )
     .slice(0, 30);
   const select = (n: number) => {
     const a = actions[n];
@@ -102,20 +138,20 @@ export function CommandPalette({
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title="Find your next move"
-      description="Search your items or run a command."
+      title={t('Find your next move')}
+      description={t('Search your items or run a command.')}
     >
       <div className="palette-search">
         <Search size={18} />
         <input
           autoFocus
           role="combobox"
-          aria-label="Search commands and items"
+          aria-label={t('Search commands and items')}
           aria-expanded="true"
           aria-autocomplete="list"
           aria-controls="palette-options"
           aria-activedescendant={actions[index] ? `palette-${index}` : undefined}
-          placeholder="Type a command or an item name…"
+          placeholder={t('Type a command or an item name\u2026')}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -137,7 +173,7 @@ export function CommandPalette({
           }}
         />
       </div>
-      <div role="listbox" id="palette-options" aria-label="Commands" className="palette-list">
+      <div role="listbox" id="palette-options" aria-label={t('Commands')} className="palette-list">
         {actions.map((a, n) => (
           <button
             key={a.id}
@@ -150,8 +186,8 @@ export function CommandPalette({
           >
             <a.icon size={16} />
             <span>
-              <b>{a.title}</b>
-              <small>{a.detail}</small>
+              <b>{a.id.startsWith('item:') ? a.title : t(a.title)}</b>
+              <small>{t(a.detail)}</small>
             </span>
             {n === index && <Kbd>↵</Kbd>}
           </button>
@@ -159,16 +195,18 @@ export function CommandPalette({
       </div>
       {!actions.length && (
         <EmptyState
-          title="No matching moves"
-          description="Try another word or a shorter item name."
+          title={t('No matching moves')}
+          description={t('Try another word or a shorter item name.')}
         />
       )}
       <div className="palette-footer">
         <span>
-          <Kbd>↑</Kbd> <Kbd>↓</Kbd> to navigate
+          <Kbd>↑</Kbd> <Kbd>↓</Kbd>
+          {t('to navigate')}
         </span>
         <span>
-          <Kbd>esc</Kbd> to close
+          <Kbd>{t('esc')}</Kbd>
+          {t('to close')}
         </span>
       </div>
     </Modal>
